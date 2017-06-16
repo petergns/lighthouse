@@ -98,25 +98,21 @@ describe('Best Practices: unused css rules audit', () => {
       baseSheet = {
         header: {sourceURL: baseUrl},
         content: 'dummy',
-        used: [{dummy: 1}],
-        unused: [],
+        usedRules: [],
       };
     });
 
     it('correctly computes potentialSavings', () => {
-      assert.equal(map({used: [], unused: [1, 2]}).wastedPercent, 100);
-      assert.equal(map({used: [1, 2], unused: [1, 2]}).wastedPercent, 50);
-      assert.equal(map({used: [1, 2], unused: []}).wastedPercent, 0);
+      assert.equal(map({usedRules: []}).wastedPercent, 100);
+      assert.equal(map({usedRules: [{startOffset: 0, endOffset: 3}]}).wastedPercent, 40);
+      assert.equal(map({usedRules: [{startOffset: 0, endOffset: 5}]}).wastedPercent, 0);
     });
 
     it('correctly computes url', () => {
-      assert.equal(map({header: {sourceURL: ''}}).url, '*inline*```dummy```');
-      assert.equal(map({header: {sourceURL: 'a'}}, 'http://g.co/a').url, '*inline*```dummy```');
+      const expectedPreview = {type: 'code', text: 'dummy'};
+      assert.deepEqual(map({header: {sourceURL: ''}}).url, expectedPreview);
+      assert.deepEqual(map({header: {sourceURL: 'a'}}, 'http://g.co/a').url, expectedPreview);
       assert.equal(map({header: {sourceURL: 'foobar'}}).url, '/foobar');
-    });
-
-    it('does not give content preview when url is present', () => {
-      assert.ok(!/dummy/.test(map({header: {sourceURL: 'foobar'}}).url));
     });
   });
 
@@ -175,13 +171,8 @@ describe('Best Practices: unused css rules audit', () => {
         requestNetworkRecords,
         URL: {finalUrl: ''},
         CSSUsage: [
-          {styleSheetId: 'a', used: true},
-          {styleSheetId: 'a', used: false},
-          {styleSheetId: 'a', used: false},
-          {styleSheetId: 'a', used: false},
-          {styleSheetId: 'b', used: true},
-          {styleSheetId: 'b', used: false},
-          {styleSheetId: 'c', used: false},
+          {styleSheetId: 'a', used: true, startOffset: 0, endOffset: 11}, // 44 * 1 / 4
+          {styleSheetId: 'b', used: true, startOffset: 0, endOffset: 3075}, // 2050 * 3 / 2
         ],
         Styles: [
           {
@@ -199,6 +190,8 @@ describe('Best Practices: unused css rules audit', () => {
         ]
       }).then(result => {
         assert.equal(result.results.length, 2);
+        assert.ok(!result.results[0].debugString, 'present network record errored');
+        assert.ok(result.results[1].debugString, 'missing network record did not error');
         assert.equal(result.results[0].totalBytes, 10 * 1024);
         assert.equal(result.results[1].totalBytes, 2050);
         assert.equal(result.results[0].wastedPercent, 75);
@@ -212,10 +205,7 @@ describe('Best Practices: unused css rules audit', () => {
         requestNetworkRecords,
         URL: {finalUrl: ''},
         CSSUsage: [
-          {styleSheetId: 'a', used: true},
-          {styleSheetId: 'a', used: true},
-          {styleSheetId: 'a', used: false},
-          {styleSheetId: 'b', used: false},
+          {styleSheetId: 'a', used: true, startOffset: 0, endOffset: 33}, // 44 * 3 / 4
         ],
         Styles: [
           {
@@ -239,12 +229,8 @@ describe('Best Practices: unused css rules audit', () => {
         requestNetworkRecords,
         URL: {finalUrl: ''},
         CSSUsage: [
-          {styleSheetId: 'a', used: true},
-          {styleSheetId: 'a', used: true},
-          {styleSheetId: 'a', used: false},
-          {styleSheetId: 'b', used: true},
-          {styleSheetId: 'b', used: false},
-          {styleSheetId: 'b', used: false},
+          {styleSheetId: 'a', used: true, startOffset: 0, endOffset: 8000}, // 4000 * 3 / 2
+          {styleSheetId: 'b', used: true, startOffset: 0, endOffset: 500}, // 500 * 3 / 3
         ],
         Styles: [
           {
@@ -256,21 +242,21 @@ describe('Best Practices: unused css rules audit', () => {
             content: `${generate('123', 500)}`
           },
           {
-            header: {styleSheetId: 'c', sourceURL: 'c.css'},
+            header: {styleSheetId: 'c', sourceURL: 'file://c.css'},
             content: '@import url(http://googlefonts.com?myfont)'
           },
           {
-            header: {styleSheetId: 'd', sourceURL: 'd.css'},
+            header: {styleSheetId: 'd', sourceURL: 'file://d.css'},
             content: '/* nothing to see here */'
           },
           {
-            header: {styleSheetId: 'e', sourceURL: 'e.css'},
+            header: {styleSheetId: 'e', sourceURL: 'file://e.css'},
             content: '       '
           },
         ]
       }).then(result => {
         assert.equal(result.results.length, 1);
-        assert.equal(result.results[0].numUnused, 1);
+        assert.equal(Math.floor(result.results[0].wastedPercent), 33);
       });
     });
   });

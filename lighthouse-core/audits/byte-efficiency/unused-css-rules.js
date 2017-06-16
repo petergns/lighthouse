@@ -39,10 +39,10 @@ class UnusedCSSRules extends ByteEfficiencyAudit {
           indexed[record.url] = record;
           return indexed;
         }, {});
+
     return styles.reduce((indexed, stylesheet) => {
       indexed[stylesheet.header.styleSheetId] = Object.assign({
-        used: [],
-        unused: [],
+        usedRules: [],
         networkRecord: indexedNetworkRecords[stylesheet.header.sourceURL],
       }, stylesheet);
       return indexed;
@@ -50,14 +50,11 @@ class UnusedCSSRules extends ByteEfficiencyAudit {
   }
 
   /**
-   * Counts the number of unused rules and adds count information to sheets.
+   * Adds used rules to their corresponding stylesheet.
    * @param {!Array.<{styleSheetId: string, used: boolean}>} rules The output of the CSSUsage gatherer.
    * @param {!Object} indexedStylesheets Stylesheet information indexed by id.
-   * @return {number} The number of unused rules.
    */
-  static countUnusedRules(rules, indexedStylesheets) {
-    let unused = 0;
-
+  static indexUsedRules(rules, indexedStylesheets) {
     rules.forEach(rule => {
       const stylesheetInfo = indexedStylesheets[rule.styleSheetId];
 
@@ -66,14 +63,44 @@ class UnusedCSSRules extends ByteEfficiencyAudit {
       }
 
       if (rule.used) {
-        stylesheetInfo.used.push(rule);
-      } else {
-        unused++;
-        stylesheetInfo.unused.push(rule);
+        stylesheetInfo.usedRules.push(rule);
       }
     });
+  }
 
-    return unused;
+  /**
+   * @param {!Object} stylesheetInfo
+   * @param {boolean} isInline
+   * @return {{debugString: string|undefined, wastedBytes: number, totalBytes: number}}
+   */
+  static computeUsage(stylesheetInfo, isInline) {
+    let usedUncompressedBytes = 0;
+    const totalUncompressedBytes = stylesheetInfo.content.length;
+
+    for (const usedRule of stylesheetInfo.usedRules) {
+      usedUncompressedBytes += usedRule.endOffset - usedRule.startOffset;
+    }
+
+    // If we don't know for sure how many bytes this sheet used on the network,
+    // we can guess it was roughly the size of the content gzipped.
+    const totalBytes = stylesheetInfo.networkRecord ?
+        stylesheetInfo.networkRecord.transferSize :
+        Math.round(stylesheetInfo.content.length / 3);
+
+    const percentUnused = (totalUncompressedBytes - usedUncompressedBytes) / totalUncompressedBytes;
+    const wastedBytes = Math.round(percentUnused * totalBytes);
+
+    let debugString;
+    if (!isInline && !stylesheetInfo.networkRecord) {
+      debugString = `Unable to find network record for ${stylesheetInfo.header.sourceURL}`;
+    }
+
+    return {
+      debugString,
+      wastedBytes,
+      wastedPercent: percentUnused * 100,
+      totalBytes,
+    };
   }
 
   /**
@@ -115,40 +142,25 @@ class UnusedCSSRules extends ByteEfficiencyAudit {
   /**
    * @param {!Object} stylesheetInfo The stylesheetInfo object.
    * @param {string} pageUrl The URL of the page, used to identify inline styles.
-   * @return {!{url: string, label: string, code: string}} The result for the URLLIST formatter.
+   * @return {?{url: string, wastedBytes: number, totalBytes: number}}
    */
   static mapSheetToResult(stylesheetInfo, pageUrl) {
-    const numUsed = stylesheetInfo.used.length;
-    const numUnused = stylesheetInfo.unused.length;
-
-    if ((numUsed === 0 && numUnused === 0) || stylesheetInfo.isDuplicate) {
+    if (stylesheetInfo.isDuplicate) {
       return null;
     }
 
     let url = stylesheetInfo.header.sourceURL;
+    let isInline = false;
     if (!url || url === pageUrl) {
       const contentPreview = UnusedCSSRules.determineContentPreview(stylesheetInfo.content);
-      url = '*inline*```' + contentPreview + '```';
+      url = {type: 'code', text: contentPreview};
+      isInline = true;
     } else {
       url = URL.getURLDisplayName(url);
     }
 
-    // If we don't know for sure how many bytes this sheet used on the network,
-    // we can guess it was roughly the size of the content gzipped.
-    const totalBytes = stylesheetInfo.networkRecord ?
-        stylesheetInfo.networkRecord.transferSize :
-        Math.round(stylesheetInfo.content.length / 3);
-
-    const percentUnused = numUnused / (numUsed + numUnused);
-    const wastedBytes = Math.round(percentUnused * totalBytes);
-
-    return {
-      url,
-      numUnused,
-      wastedBytes,
-      wastedPercent: percentUnused * 100,
-      totalBytes,
-    };
+    const usage = UnusedCSSRules.computeUsage(stylesheetInfo, isInline);
+    return Object.assign({url}, usage);
   }
 
   /**
@@ -163,21 +175,27 @@ class UnusedCSSRules extends ByteEfficiencyAudit {
     const devtoolsLogs = artifacts.devtoolsLogs[ByteEfficiencyAudit.DEFAULT_PASS];
     return artifacts.requestNetworkRecords(devtoolsLogs).then(networkRecords => {
       const indexedSheets = UnusedCSSRules.indexStylesheetsById(styles, networkRecords);
-      UnusedCSSRules.countUnusedRules(usage, indexedSheets);
-      const results = Object.keys(indexedSheets).map(sheetId => {
-        return UnusedCSSRules.mapSheetToResult(indexedSheets[sheetId], pageUrl);
-      }).filter(sheet => sheet && sheet.wastedBytes > 1024);
+      UnusedCSSRules.indexUsedRules(usage, indexedSheets);
+
+      const results = Object.keys(indexedSheets)
+          .map(sheetId => UnusedCSSRules.mapSheetToResult(indexedSheets[sheetId], pageUrl))
+          .filter(sheet => sheet && sheet.wastedBytes > 1024);
 
       const headings = [
         {key: 'url', itemType: 'url', text: 'URL'},
-        {key: 'numUnused', itemType: 'url', text: 'Unused Rules'},
         {key: 'totalKb', itemType: 'text', text: 'Original'},
         {key: 'potentialSavings', itemType: 'text', text: 'Potential Savings'},
       ];
 
+      const debugString = results
+          .map(result => result.debugString)
+          .filter(Boolean)
+          .pop();
+
       return {
+        debugString,
         results,
-        headings
+        headings,
       };
     });
   }
