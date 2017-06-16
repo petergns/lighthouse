@@ -36,16 +36,14 @@ module.exports = {
       'dobetterweb/websql',
     ]
   },
-  {
-    passName: 'extrasPass',
-    useThrottling: false,
-    // Just wait for onload
-    networkQuietThresholdMs: 0,
-    gatherers: [
-      'styles',
-      'css-usage',
-    ],
-  },
+  // {
+  //   passName: 'extrasPass',
+  //   useThrottling: false,
+  //   gatherers: [
+  //     'styles',
+  //     'css-usage',
+  //   ],
+  // },
   {
     passName: 'offlinePass',
     useThrottling: false,
@@ -132,7 +130,7 @@ module.exports = {
     'accessibility/video-caption',
     'accessibility/video-description',
     'byte-efficiency/total-byte-weight',
-    'byte-efficiency/unused-css-rules',
+    // 'byte-efficiency/unused-css-rules',
     'byte-efficiency/offscreen-images',
     'byte-efficiency/uses-webp-images',
     'byte-efficiency/uses-optimized-images',
@@ -145,7 +143,7 @@ module.exports = {
     'dobetterweb/link-blocking-first-paint',
     'dobetterweb/no-document-write',
     'dobetterweb/no-mutation-events',
-    'dobetterweb/no-old-flexbox',
+    // 'dobetterweb/no-old-flexbox',
     'dobetterweb/no-websql',
     'dobetterweb/notification-on-start',
     'dobetterweb/password-inputs-can-be-pasted-into',
@@ -239,7 +237,7 @@ module.exports = {
         {id: 'estimated-input-latency', weight: 1, group: 'perf-metric'},
         {id: 'link-blocking-first-paint', weight: 0, group: 'perf-hint'},
         {id: 'script-blocking-first-paint', weight: 0, group: 'perf-hint'},
-        {id: 'unused-css-rules', weight: 0, group: 'perf-hint'},
+        // {id: 'unused-css-rules', weight: 0, group: 'perf-hint'},
         {id: 'uses-responsive-images', weight: 0, group: 'perf-hint'},
         {id: 'offscreen-images', weight: 0, group: 'perf-hint'},
         {id: 'uses-optimized-images', weight: 0, group: 'perf-hint'},
@@ -303,7 +301,7 @@ module.exports = {
         {id: 'no-websql', weight: 1},
         {id: 'is-on-https', weight: 1},
         {id: 'uses-http2', weight: 1},
-        {id: 'no-old-flexbox', weight: 1},
+        // {id: 'no-old-flexbox', weight: 1},
         {id: 'uses-passive-event-listeners', weight: 1},
         {id: 'no-mutation-events', weight: 1},
         {id: 'no-document-write', weight: 1},

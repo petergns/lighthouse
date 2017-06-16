@@ -360,6 +360,7 @@ describe('Config', () => {
       settings: {
         onlyCategories: ['performance'],
         onlyAudits: ['is-on-https'],
+        skipAudits: ['unused-css-rules', 'no-old-flexbox'],
       },
     });
 
