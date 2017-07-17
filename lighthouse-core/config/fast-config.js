@@ -35,4 +35,14 @@ module.exports = {
       gatherers: [],
     },
   ],
+  audits: [
+    'predictive-perf',
+  ],
+  categories: {
+    performance: {
+      audits: [
+        {id: 'predictive-perf', weight: 5, group: 'perf-metric'},
+      ],
+    },
+  },
 };

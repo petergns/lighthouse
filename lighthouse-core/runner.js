@@ -258,7 +258,7 @@ class Runner {
     const computedArtifacts = {};
     require('fs').readdirSync(__dirname + '/gather/computed').forEach(function(filename) {
       // Skip base class.
-      if (filename === 'computed-artifact.js') return;
+      if (filename === 'computed-artifact.js' || filename.startsWith('dependency-graph')) return;
 
       // Drop `.js` suffix to keep browserify import happy.
       filename = filename.replace(/\.js$/, '');
