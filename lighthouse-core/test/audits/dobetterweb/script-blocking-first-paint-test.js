@@ -19,13 +19,22 @@ describe('Script Block First Paint audit', () => {
       src: 'http://google.com/js/app.js',
       url: 'http://google.com/js/app.js',
     };
-    const auditResult = ScriptBlockingFirstPaintAudit.audit({
+    const timestamps = {firstContentfulPaint: 5600 * 1000};
+    return ScriptBlockingFirstPaintAudit.audit({
+      traces: {},
+      requestTraceOfTab: () => Promise.resolve({timestamps}),
       TagsBlockingFirstPaint: [
         {
           tag: scriptDetails,
           transferSize: 100,
           startTime: 1,
           endTime: 1.1
+        },
+        {
+          tag: scriptDetails,
+          transferSize: 100,
+          startTime: 15,
+          endTime: 15.1
         },
         {
           tag: scriptDetails,
@@ -39,21 +48,25 @@ describe('Script Block First Paint audit', () => {
           spendTime: 110
         }
       ]
+    }).then(auditResult => {
+      assert.equal(auditResult.rawValue, 150);
+      assert.equal(auditResult.displayValue, `2 resources delayed first paint by 150${NBSP}ms`);
+      const results = auditResult.details.items;
+      assert.equal(results.length, 2);
+      assert.ok(results[0][0].text.includes('js/app.js'), 'has a url');
+      assert.equal(results[0][2].text, `150${NBSP}ms`);
+      assert.equal(results[1][2].text, `50${NBSP}ms`);
     });
-    assert.equal(auditResult.rawValue, 150);
-    assert.equal(auditResult.displayValue, `2 resources delayed first paint by 150${NBSP}ms`);
-    const results = auditResult.details.items;
-    assert.equal(results.length, 2);
-    assert.ok(results[0][0].text.includes('js/app.js'), 'has a url');
-    assert.equal(results[0][2].text, `150${NBSP}ms`);
-    assert.equal(results[1][2].text, `50${NBSP}ms`);
   });
 
   it('passes when there are no scripts found which block first paint', () => {
-    const auditResult = ScriptBlockingFirstPaintAudit.audit({
+    return ScriptBlockingFirstPaintAudit.audit({
+      traces: {},
+      requestTraceOfTab: () => Promise.resolve({timestamps: {}}),
       TagsBlockingFirstPaint: []
+    }).then(auditResult => {
+      assert.equal(auditResult.rawValue, 0);
+      assert.equal(auditResult.details.items.length, 0);
     });
-    assert.equal(auditResult.rawValue, 0);
-    assert.equal(auditResult.details.items.length, 0);
   });
 });
